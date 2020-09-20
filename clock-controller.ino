@@ -185,11 +185,11 @@ void setup() {
       }
       // invert polarity on next run
       state = state * -1;
-      delay(800);
+      delay(IMPULSE_ON);
       digitalWrite(PIN_CH00, LOW);
       digitalWrite(PIN_CH01, LOW);
-      delay(200);
-      preferences.putShort("state", state)
+      delay(IMPULSE_WAIT);
+      preferences.putShort("state", state);
       initState = digitalRead(PIN_INIT);
     }
     display.clear();
@@ -218,7 +218,7 @@ void fixState(short curr_state) {
   }
   // invert polarity on the next run
   state = state * -1;
-  delay(800);
+  delay(IMPULSE_ON);
   digitalWrite(PIN_CH00, LOW);
   digitalWrite(PIN_CH01, LOW);
   preferences.putShort("state", state);
@@ -276,7 +276,7 @@ void loop() {
 
     if (curr_state != abs(state)) {
       fixState(curr_state);
-      delay(200); // cool down device :)
+      delay(IMPULSE_WAIT); // cool down device :)
     }
     delay(remainingTimeBudget);
   }
