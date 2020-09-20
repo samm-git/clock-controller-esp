@@ -46,6 +46,17 @@ static const char ntpServerName[] = "cz.pool.ntp.org";
 unsigned int localPort = 8888;
 WiFiUDP udp;
 
+/* 
+ *  Slave clock configuration
+ *  
+ *  I been not able to find specification for this clock, so experimentally
+ *  If impulse is > 200ms clock sometime fails to move the arrow on next switch
+ *  
+ *  IMPULSE_WAIT is used in the INIT mode and if slave catching up master
+ */
+#define IMPULSE_ON 150
+#define IMPULSE_WAIT 850
+
 // Initialize the OLED display using Wire library
 SSD1306Wire display(DISP_I2C, DISP_SDA, DISP_SCL);
 
