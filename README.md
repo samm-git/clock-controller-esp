@@ -15,11 +15,13 @@ and DST rules. The state of the slave clock is stored in the Non-Volatile memory
 ### Hardware
  
  - [ESP-WROOM-32 0.96" OLED ESP32 WIFI-BT Dual-mode 2.4GHz For Wemos D1 AP STA](https://www.ebay.com/itm/ESP-WROOM-32-0-96-OLED-ESP32-WIFI-BT-Dual-mode-2-4GHz-For-Wemos-D1-AP-STA-/332196121504)
- - [L298N motor driver module H-Bridge](https://www.instructables.com/id/Control-DC-and-stepper-motors-with-L298N-Dual-Moto/)
+ - [L298N motor driver module H-Bridge](https://www.instructables.com/id/Control-DC-and-stepper-motors-with-L298N-Dual-Moto/). 
  - 12V 1A power supply
  
 ## How it works
- 
+
+- L298N driver is used to generate 12V impulses to drive the clock and to provide 5V power
+  to the ESP board.
 - After startup ESP trying to connect to WIFI and get time from the NTP
 - If time is synced - ESP compares it with slave time in the Non-Volatile memory and updates the slave clock
 - Slave status is stored in Non-Volatile memory every minute, using [Preferences](https://github.com/espressif/arduino-esp32/tree/master/libraries/Preferences) library on the [NVS partition](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/storage/nvs_flash.html) to optimize wear-out. Probably using the I2C FRAM module for that would be a better choice.
