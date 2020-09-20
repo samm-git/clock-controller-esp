@@ -1,0 +1,19 @@
+name: CodeBuild
+
+on: [push, pull_request]
+jobs:
+  build:
+    name: Test compiling examples for esp8266
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Compile all examples
+        uses: ArminJo/arduino-test-compile@v2
+      with:
+        arduino-board-fqbn: esp32:esp32:esp32:PSRAM=disabled,PartitionScheme=default,CPUFreq=240,FlashMode=qio,FlashFreq=80,FlashSize=4M,UploadSpeed=921600,DebugLevel=none
+        platform-url: https://github.com/espressif/arduino-esp32/blob/master/package.json
+        required-libraries: TimeLib,Timezone
+        sketch-names: clock-controller.ini
