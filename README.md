@@ -21,7 +21,7 @@ and DST rules. The state of the slave clock is stored in the Non-Volatile memory
 ## How it works
 
 - L298N driver is used to generate 12V impulses to drive the clock and to provide 5V power
-  to the ESP board.
+  to the ESP board. It also allows to invert output polarity, so no relays needed. 
 - After startup ESP trying to connect to WIFI and get time from the NTP
 - If time is synced - ESP compares it with slave time in the Non-Volatile memory and updates the slave clock
 - Slave status is stored in Non-Volatile memory every minute, using [Preferences](https://github.com/espressif/arduino-esp32/tree/master/libraries/Preferences) library on the [NVS partition](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/storage/nvs_flash.html) to optimize wear-out. Probably using the I2C FRAM module for that would be a better choice.
