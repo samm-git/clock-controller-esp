@@ -3,7 +3,7 @@ name: CodeBuild
 on: [push, pull_request]
 jobs:
   build:
-    name: Test compiling examples for esp8266
+    name: Test of the clock-controller.ino compilation for the ESP32 target
     runs-on: ubuntu-latest
 
     steps:
