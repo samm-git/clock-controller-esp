@@ -32,3 +32,7 @@ and DST rules. The state of the slave clock is stored in the Non-Volatile memory
 ## Init mode
 
 As ESP has no information about the slave clock position - we need to sync them. To do this - connect PIN_INIT (15) pin to GND and restart ESP. It will move arrows every second. Wait until the clock shows **12:00** and immediately unplug the wire. The clock will be synced with ESP and will switch to normal mode. 
+
+## Final result (not yet in a box)
+
+![Clock and controller](clock.jpg "Clock and controller")
