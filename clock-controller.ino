@@ -20,7 +20,7 @@
    SOFTWARE.
 */
 
-#include <EEPROM.h>
+#include <Preferences.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include <Timezone.h>    // https://github.com/JChristensen/Timezone
@@ -59,6 +59,7 @@ short state = 0;
 int wifi_connected = 0;
 int ntp_started = 0;
 char console_text[256];
+Preferences preferences;
 
 // Central European Time definition
 TimeChangeRule CEST = { "CEST", Last, Sun, Mar, 2, 120 }; // Central European Summer Time
@@ -114,18 +115,17 @@ int overlaysCount = 1;
 
 void setup() {
   Serial.begin(115200);
-  /* Read slave clock state from the EEPROM.
+  /* Read slave clock state from the EEPROM using Preferences lib.
      We have 12 * 60 (720) possible values
      in the clock and also we need to keep last used polarity as a sign
      This mean that valid values are from -721 to +721 excluding 0
   */
-  EEPROM.begin(sizeof(short));
-  EEPROM.get(0, state);
+  preferences.begin("clock", false);
+  state = preferences.getShort("state", -1);
   Serial.printf("Booting... Initial state is: %d\n", state);
   if (state < -721 || state > 721 || state == 0) {
     state = 1; // init clock on 12:00
-    EEPROM.put(0, state);
-    EEPROM.commit();
+    preferences.putShort("state", state);
   }
 
   pinMode(PIN_CH00, OUTPUT); // init GPIO to control clock motor
@@ -189,8 +189,7 @@ void setup() {
       digitalWrite(PIN_CH00, LOW);
       digitalWrite(PIN_CH01, LOW);
       delay(200);
-      EEPROM.put(0, state);
-      EEPROM.commit();
+      preferences.putShort("state", state)
       initState = digitalRead(PIN_INIT);
     }
     display.clear();
@@ -222,8 +221,7 @@ void fixState(short curr_state) {
   delay(800);
   digitalWrite(PIN_CH00, LOW);
   digitalWrite(PIN_CH01, LOW);
-  EEPROM.put(0, state);
-  EEPROM.commit();
+  preferences.putShort("state", state);
 }
 
 char * formatState(int mystate, char * buf, int bufsize) {
