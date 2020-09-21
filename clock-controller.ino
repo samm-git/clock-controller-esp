@@ -29,6 +29,18 @@
 #include "OLEDDisplayUi.h"
 #include "images.h"      // Include custom images
 
+// WIFI configuration
+#define WIFI_SSID "myssid"
+#define WIFI_KEY  "mypass"
+
+// NTP server name or IP
+static const char ntpServerName[] = "cz.pool.ntp.org";
+
+// Time Zone (DST) settings, change to your country
+TimeChangeRule CEST = { "CEST", Last, Sun, Mar, 2, 120 }; // Central European Summer Time
+TimeChangeRule CET =  { "CET ", Last, Sun, Oct, 3, 60  }; // Central European Standard Time
+Timezone ClockTZ(CEST, CET);
+
 // motor controller CH0 pins
 #define PIN_CH00 12
 #define PIN_CH01 13
@@ -39,10 +51,6 @@
 #define DISP_SDA 5
 #define DISP_SCL 4
 
-// WIFI configuration
-#define WIFI_SSID "myssid"
-#define WIFI_KEY  "mypass"
-static const char ntpServerName[] = "cz.pool.ntp.org";
 unsigned int localPort = 8888;
 WiFiUDP udp;
 
@@ -71,11 +79,6 @@ int wifi_connected = 0;
 int ntp_started = 0;
 char console_text[256];
 Preferences preferences;
-
-// Central European Time definition
-TimeChangeRule CEST = { "CEST", Last, Sun, Mar, 2, 120 }; // Central European Summer Time
-TimeChangeRule CET =  { "CET ", Last, Sun, Oct, 3, 60  }; // Central European Standard Time
-Timezone ClockTZ(CEST, CET);
 
 // utility function for digital clock display: prints leading 0
 String twoDigits(int digits) {
