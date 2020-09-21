@@ -221,7 +221,7 @@ void fixState(short curr_state) {
   Serial.printf("changing state from %d [%s] to %d [%s])\n", state, formatState(abs(state), buf, 16), curr_state, formatState(curr_state, buf2, 16));
   // this should never happens. If clock is behind NTP to up to 5m - do nothing, just wait
   if (abs(state)>curr_state && (abs(state)-curr_state)<=5) {
-    Serial.printf("Clock is behind NTP for %d minutes, ignoring\n", (abs(state)-curr_state));
+    Serial.printf("Clock is behind NTP for %d minutes, ignoring\n", (int)(abs(state)-curr_state));
     return;
   }
   if (state > 0) {
