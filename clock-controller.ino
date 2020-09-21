@@ -218,12 +218,12 @@ void fixState(short curr_state) {
   Serial.printf("changing state from %d [%s] to %d [%s])\n", state, formatState(abs(state), buf, 16), curr_state, formatState(curr_state, buf2, 16));
   if (state > 0) {
     state++;
-    if (state > 721) state = 1;
+    if (state >= 721) state = 1;
     digitalWrite(PIN_CH00, HIGH);
     digitalWrite(PIN_CH01, LOW);
   } else {
     state--;
-    if (state < -721) state = -1;
+    if (state <= -721) state = -1;
     digitalWrite(PIN_CH00, LOW);
     digitalWrite(PIN_CH01, HIGH);
   }
