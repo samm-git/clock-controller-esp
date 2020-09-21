@@ -54,12 +54,12 @@ Timezone ClockTZ(CEST, CET);
 unsigned int localPort = 8888;
 WiFiUDP udp;
 
-/* 
+/*
  *  Slave clock configuration
- *  
+ *
  *  I been not able to find specification for this clock, so experimentally
  *  If impulse is > 200ms clock sometime fails to move the arrow on next switch
- *  
+ *
  *  IMPULSE_WAIT is used in the INIT mode and if slave catching up master
  */
 #define IMPULSE_ON 150
@@ -219,6 +219,11 @@ void setup() {
 void fixState(short curr_state) {
   char buf[16], buf2[16];
   Serial.printf("changing state from %d [%s] to %d [%s])\n", state, formatState(abs(state), buf, 16), curr_state, formatState(curr_state, buf2, 16));
+  // this should never happens. If clock is behind NTP to up to 5m - do nothing, just wait
+  if (abs(state)>curr_state && (abs(state)-curr_state)<=5) {
+    Serial.printf("Clock is behind NTP for %d minutes, ignoring\n", (int)(abs(state)-curr_state));
+    return;
+  }
   if (state > 0) {
     state++;
     if (state >= 721) state = 1;
