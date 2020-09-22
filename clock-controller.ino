@@ -26,7 +26,6 @@
 #include <Timezone.h>    // https://github.com/JChristensen/Timezone
 #include <TimeLib.h>     // https://playground.arduino.cc/Code/Time
 #include "SSD1306Wire.h" // SSD1306 OLED: https://github.com/ThingPulse/esp8266-oled-ssd1306
-#include "OLEDDisplayUi.h"
 #include "images.h"      // Include custom images
 
 // WIFI configuration
@@ -68,15 +67,9 @@ WiFiUDP udp;
 // Initialize the OLED display using Wire library
 SSD1306Wire display(DISP_I2C, DISP_SDA, DISP_SCL);
 
-OLEDDisplayUi ui( & display);
-
-int screenW = 128;
-int screenH = 64;
-int clockCenterX = screenW / 2;
-int clockCenterY = ((screenH - 16) / 2);
 short state = 0;
-int wifi_connected = 0;
-int ntp_started = 0;
+int8_t show_impulse = 0;
+
 char console_text[256];
 Preferences preferences;
 
@@ -89,43 +82,6 @@ String twoDigits(int digits) {
     return String(digits);
   }
 }
-
-void clockOverlay(OLEDDisplay * display, OLEDDisplayUiState * state) {
-
-}
-
-void digitalClockFrame(OLEDDisplay * display, OLEDDisplayUiState * state, int16_t x, int16_t y) {
-  time_t utc = now();
-  time_t local_t = ClockTZ.toLocal(utc);
-  String timenow = String(hour(local_t)) + ":" + twoDigits(minute(local_t)) + ":" + twoDigits(second(local_t));
-  display -> setTextAlignment(TEXT_ALIGN_CENTER);
-  display -> setFont(ArialMT_Plain_24);
-  display -> drawString(clockCenterX + x, clockCenterY + y, timenow);
-}
-
-void digitalClockStateFrame(OLEDDisplay * display, OLEDDisplayUiState * oled_state, int16_t x, int16_t y) {
-  char buf[16];
-  char * timenow = formatState(abs(state), buf, 16);
-  display -> setTextAlignment(TEXT_ALIGN_CENTER);
-  display -> setFont(ArialMT_Plain_24);
-  display -> drawString(clockCenterX + x, clockCenterY + y, timenow);
-}
-
-// This array keeps function pointers to all frames
-// frames are the single views that slide in
-FrameCallback frames[] = {
-  digitalClockFrame,
-  digitalClockStateFrame
-};
-
-// how many frames are there?
-int frameCount = 2;
-
-// Overlays are statically drawn on top of a frame eg. a clock
-OverlayCallback overlays[] = {
-  clockOverlay
-};
-int overlaysCount = 1;
 
 void setup() {
   Serial.begin(115200);
@@ -146,31 +102,9 @@ void setup() {
   pinMode(PIN_CH01, OUTPUT);
   pinMode(PIN_INIT, INPUT_PULLUP);
 
-  // set UI FPS
-  ui.setTargetFPS(30);
-
-  // Customize the active and inactive symbol
-  ui.setActiveSymbol(activeSymbol);
-  ui.setInactiveSymbol(inactiveSymbol);
-
-  ui.setIndicatorPosition(TOP);
-
-  // Defines where the first frame is located in the bar.
-  ui.setIndicatorDirection(LEFT_RIGHT);
-
-  // could be SLIDE_LEFT, SLIDE_RIGHT, SLIDE_UP, SLIDE_DOWN
-  ui.setFrameAnimation(SLIDE_LEFT);
-
-  // Add frames
-  ui.setFrames(frames, frameCount);
-
-  // Add overlays
-  ui.setOverlays(overlays, overlaysCount);
-
-  // Initialising the UI will init the display too.
-  ui.init();
-
+  display.init();
   display.flipScreenVertically();
+
   int initState = digitalRead(PIN_INIT);
 
   // if init mode is on - state is set to 12:00 and pin must be unplugged when
@@ -212,6 +146,29 @@ void setup() {
   // connect to wifi
   sprintf(console_text, "Connecting to wifi (%s)", WIFI_SSID);
   WiFi.begin(WIFI_SSID, WIFI_KEY);
+  display.clear();
+  display.setFont(ArialMT_Plain_10);
+  display.drawStringMaxWidth(0, 0, 128,
+      console_text);
+  display.display();
+  while (WiFi.status() != WL_CONNECTED) {
+      delay(10);
+  }
+  Serial.print("Connected, IP address: ");
+  Serial.println(WiFi.localIP());
+
+  Serial.println("Starting UDP...");
+  udp.begin(localPort);
+  Serial.println("Waiting for sync");
+  display.drawStringMaxWidth(0, 10, 128,
+    "Waiting for NTP sync");
+  display.display();
+  setSyncProvider(getNtpTime);
+  setSyncInterval(300); // sync with NTP once in a 5m
+  while (timeStatus() == timeNotSet) {
+    delay(10);
+  }
+  display.clear();
 }
 
 /*-------- Move arrow and update state ----------*/
@@ -227,77 +184,87 @@ void fixState(short curr_state) {
   if (state > 0) {
     state++;
     if (state >= 721) state = 1;
+    show_impulse = 1;
     digitalWrite(PIN_CH00, HIGH);
     digitalWrite(PIN_CH01, LOW);
   } else {
     state--;
     if (state <= -721) state = -1;
+    show_impulse = -1;
     digitalWrite(PIN_CH00, LOW);
     digitalWrite(PIN_CH01, HIGH);
   }
+  updateScreen();
   // invert polarity on the next run
   state = state * -1;
   delay(IMPULSE_ON);
   digitalWrite(PIN_CH00, LOW);
   digitalWrite(PIN_CH01, LOW);
+  show_impulse = 0;
+  updateScreen();
   preferences.putShort("state", state);
 }
 
+// convert state variable to the human-readable format
 char * formatState(int mystate, char * buf, int bufsize) {
   mystate--;
-  snprintf(buf, bufsize, "%d:%02d", mystate / 60, mystate - (mystate / 60) * 60);
+  snprintf(buf, bufsize, "%2d:%02d", (mystate / 60) ? mystate / 60 : 12, mystate - (mystate / 60) * 60);
   return buf;
 }
 
-/*-------- Main loop ----------*/
-void loop() {
-  // init mode, clock showing state and connecting to WIFI
-  if (!wifi_connected) {
+void updateScreen() {
+    char buf[16];
     display.clear();
     display.setFont(ArialMT_Plain_10);
-    // display.setTextAlignment(TEXT_ALIGN_RIGHT);
-    display.drawStringMaxWidth(0, 0, 128,
-      console_text);
-    display.display();
+    String wifi;
     if (WiFi.status() != WL_CONNECTED) {
-      delay(10);
-      return;
+      wifi = "wifi: n/a";
+    } else {
+      wifi = "wifi: " + WiFi.SSID();
     }
-    Serial.print("Connected, IP address: ");
-    Serial.println(WiFi.localIP());
-    wifi_connected = 1;
-  }
-  if (!ntp_started) {
-    Serial.println("Starting UDP...");
-    udp.begin(localPort);
-    Serial.println("Waiting for sync");
-    display.drawStringMaxWidth(0, 10, 128,
-      "Waiting for NTP sync");
-    display.display();
-    setSyncProvider(getNtpTime);
-    setSyncInterval(300); // sync with NTP once in a 5m
-    if (timeStatus() == timeNotSet) {
-      delay(10);
-      return;
-    }
-    ntp_started = 1;
-  }
+    display.drawString(0, 0, wifi);
 
-  int remainingTimeBudget = ui.update();
-  int curr_state = 0;
-  if (remainingTimeBudget > 0) {
     time_t utc = now();
     time_t local_t = ClockTZ.toLocal(utc);
-    int hour_12 = hour(local_t);
-    if (hour_12 >= 12) hour_12 -= 12;
-    // current 12h time in minutes, starting from 1
-    short curr_state = hour_12 * 60 + minute(local_t) + 1;
-
-    if (curr_state != abs(state)) {
-      fixState(curr_state);
-      delay(IMPULSE_WAIT); // cool down device :)
+    // show NTP time
+    String timenow = String(hour(local_t)) + ":" + twoDigits(minute(local_t)) + ":" + twoDigits(second(local_t));
+    display.setFont(ArialMT_Plain_16);
+    display.drawString(2, 25, timenow);
+    display.drawLine(75, 0, 75, display.getHeight());
+    char * statenow = formatState(abs(state), buf, 16);
+    // show state of the slave clock
+    display.drawString(85, 25, statenow);
+    // show DST if active
+    if(ClockTZ.locIsDST(local_t)) {
+      String dst = "DST";
+      display.setFont(ArialMT_Plain_10);
+      display.drawString(2, 50, dst);
     }
-    delay(remainingTimeBudget);
+
+    if(show_impulse) {
+      if(show_impulse > 0) display.drawXbm(90, 50, 16, 8, polarity_a);
+      if(show_impulse < 0) display.drawXbm(90, 50, 16, 8, polarity_b);
+    }
+
+    display.display();
+}
+
+/*-------- Main loop ----------*/
+time_t last_t = 0;
+void loop() {
+  time_t utc = now();
+  time_t local_t = ClockTZ.toLocal(utc);
+  int hour_12 = hour(local_t);
+  if (hour_12 >= 12) hour_12 -= 12;
+  // current 12h time in minutes, starting from 1
+  short curr_state = hour_12 * 60 + minute(local_t) + 1;
+
+  if (curr_state != abs(state)) {
+    fixState(curr_state);
+    delay(IMPULSE_WAIT); // cool down device :)
+  }
+  if(utc!=last_t) { // update screen
+    updateScreen();
   }
 }
 
