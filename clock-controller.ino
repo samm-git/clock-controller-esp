@@ -54,13 +54,13 @@ unsigned int localPort = 8888;
 WiFiUDP udp;
 
 /*
- *  Slave clock configuration
- *
- *  I been not able to find specification for this clock, so experimentally
- *  If impulse is > 200ms clock sometime fails to move the arrow on next switch
- *
- *  IMPULSE_WAIT is used in the INIT mode and if slave catching up master
- */
+    Slave clock configuration
+
+    I been not able to find specification for this clock, so experimentally
+    If impulse is > 200ms clock sometime fails to move the arrow on next switch
+
+    IMPULSE_WAIT is used in the INIT mode and if slave catching up master
+*/
 #define IMPULSE_ON 150
 #define IMPULSE_WAIT 850
 
@@ -114,11 +114,11 @@ void setup() {
     display.clear();
     display.setFont(ArialMT_Plain_16);
     display.drawStringMaxWidth(0, 0, 128,
-      "Init mode");
+                               "Init mode");
     display.setFont(ArialMT_Plain_10);
 
     display.drawStringMaxWidth(0, 18, 128,
-      "Set clock to 12:00 and unplug when ready");
+                               "Set clock to 12:00 and unplug when ready");
     display.display();
     state = 1;
     while (initState == LOW) {
@@ -149,10 +149,10 @@ void setup() {
   display.clear();
   display.setFont(ArialMT_Plain_10);
   display.drawStringMaxWidth(0, 0, 128,
-      console_text);
+                             console_text);
   display.display();
   while (WiFi.status() != WL_CONNECTED) {
-      delay(10);
+    delay(10);
   }
   Serial.print("Connected, IP address: ");
   Serial.println(WiFi.localIP());
@@ -161,7 +161,7 @@ void setup() {
   udp.begin(localPort);
   Serial.println("Waiting for sync");
   display.drawStringMaxWidth(0, 10, 128,
-    "Waiting for NTP sync");
+                             "Waiting for NTP sync");
   display.display();
   setSyncProvider(getNtpTime);
   setSyncInterval(300); // sync with NTP once in a 5m
@@ -177,8 +177,8 @@ void fixState(short curr_state) {
   char buf[16], buf2[16];
   Serial.printf("changing state from %d [%s] to %d [%s])\n", state, formatState(abs(state), buf, 16), curr_state, formatState(curr_state, buf2, 16));
   // this should never happens. If clock is behind NTP to up to 5m - do nothing, just wait
-  if (abs(state)>curr_state && (abs(state)-curr_state)<=5) {
-    Serial.printf("Clock is behind NTP for %d minutes, ignoring\n", (int)(abs(state)-curr_state));
+  if (abs(state) > curr_state && (abs(state) - curr_state) <= 5) {
+    Serial.printf("Clock is behind NTP for %d minutes, ignoring\n", (int)(abs(state) - curr_state));
     return;
   }
   if (state > 0) {
@@ -213,40 +213,40 @@ char * formatState(int mystate, char * buf, int bufsize) {
 }
 
 void updateScreen() {
-    char buf[16];
-    display.clear();
+  char buf[16];
+  display.clear();
+  display.setFont(ArialMT_Plain_10);
+  String wifi;
+  if (WiFi.status() != WL_CONNECTED) {
+    wifi = "wifi: n/a";
+  } else {
+    wifi = "wifi: " + WiFi.SSID();
+  }
+  display.drawString(0, 0, wifi);
+
+  time_t utc = now();
+  time_t local_t = ClockTZ.toLocal(utc);
+  // show NTP time
+  String timenow = String(hour(local_t)) + ":" + twoDigits(minute(local_t)) + ":" + twoDigits(second(local_t));
+  display.setFont(ArialMT_Plain_16);
+  display.drawString(2, 25, timenow);
+  display.drawLine(75, 0, 75, display.getHeight());
+  char * statenow = formatState(abs(state), buf, 16);
+  // show state of the slave clock
+  display.drawString(85, 25, statenow);
+  // show DST if active
+  if (ClockTZ.locIsDST(local_t)) {
+    String dst = "DST";
     display.setFont(ArialMT_Plain_10);
-    String wifi;
-    if (WiFi.status() != WL_CONNECTED) {
-      wifi = "wifi: n/a";
-    } else {
-      wifi = "wifi: " + WiFi.SSID();
-    }
-    display.drawString(0, 0, wifi);
+    display.drawString(2, 50, dst);
+  }
 
-    time_t utc = now();
-    time_t local_t = ClockTZ.toLocal(utc);
-    // show NTP time
-    String timenow = String(hour(local_t)) + ":" + twoDigits(minute(local_t)) + ":" + twoDigits(second(local_t));
-    display.setFont(ArialMT_Plain_16);
-    display.drawString(2, 25, timenow);
-    display.drawLine(75, 0, 75, display.getHeight());
-    char * statenow = formatState(abs(state), buf, 16);
-    // show state of the slave clock
-    display.drawString(85, 25, statenow);
-    // show DST if active
-    if(ClockTZ.locIsDST(local_t)) {
-      String dst = "DST";
-      display.setFont(ArialMT_Plain_10);
-      display.drawString(2, 50, dst);
-    }
+  if (show_impulse) {
+    if (show_impulse > 0) display.drawXbm(90, 50, 16, 8, polarity_a);
+    if (show_impulse < 0) display.drawXbm(90, 50, 16, 8, polarity_b);
+  }
 
-    if(show_impulse) {
-      if(show_impulse > 0) display.drawXbm(90, 50, 16, 8, polarity_a);
-      if(show_impulse < 0) display.drawXbm(90, 50, 16, 8, polarity_b);
-    }
-
-    display.display();
+  display.display();
 }
 
 /*-------- Main loop ----------*/
@@ -263,7 +263,7 @@ void loop() {
     fixState(curr_state);
     delay(IMPULSE_WAIT); // cool down device :)
   }
-  if(utc!=last_t) { // update screen
+  if (utc != last_t) { // update screen
     updateScreen();
   }
 }
