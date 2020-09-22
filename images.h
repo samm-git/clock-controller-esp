@@ -1,21 +1,9 @@
-const unsigned char activeSymbol[] PROGMEM = {
-    B00000000,
-    B00000000,
-    B00011000,
-    B00100100,
-    B01000010,
-    B01000010,
-    B00100100,
-    B00011000
+const uint8_t  polarity_a[] = {
+  0x0F, 0x0F, 0x0F, 0x0F, 0x08, 0x01, 0x08, 0x01, 0x08, 0x01, 0x08, 0x01,
+  0xF8, 0x01, 0xF8, 0x01, 
 };
 
-const unsigned char inactiveSymbol[] PROGMEM = {
-    B00000000,
-    B00000000,
-    B00000000,
-    B00000000,
-    B00011000,
-    B00011000,
-    B00000000,
-    B00000000
+const uint8_t  polarity_b[] =  {
+  0xF8, 0x01, 0xF8, 0x01, 0x08, 0x01, 0x08, 0x01, 0x08, 0x01, 0x08, 0x01,
+  0x0F, 0x0F, 0x0F, 0x0F, 
 };
