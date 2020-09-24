@@ -32,8 +32,9 @@
 #define WIFI_SSID "myssid"
 #define WIFI_KEY  "mypass"
 
-// NTP server name or IP
+// NTP server name or IP, sync interval in seconds
 static const char ntpServerName[] = "cz.pool.ntp.org";
+#define NTP_SYNC_INTERVAL 300
 
 // Time Zone (DST) settings, change to your country
 TimeChangeRule CEST = { "CEST", Last, Sun, Mar, 2, 120 }; // Central European Summer Time
@@ -70,6 +71,7 @@ SSD1306Wire display(DISP_I2C, DISP_SDA, DISP_SCL);
 
 short state = 0;
 int8_t show_impulse = 0;
+time_t last_ntp_sync = 0;
 
 char console_text[256];
 Preferences preferences;
@@ -142,7 +144,6 @@ void setup() {
     }
     display.clear();
   }
-
   // workaround for the ESP32 SDK bug, see 
   // https://github.com/espressif/arduino-esp32/issues/2537#issuecomment-508558849
   WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE);
@@ -168,7 +169,7 @@ void setup() {
                              "Waiting for NTP sync");
   display.display();
   setSyncProvider(getNtpTime);
-  setSyncInterval(300); // sync with NTP once in a 5m
+  setSyncInterval(NTP_SYNC_INTERVAL); // sync with NTP
   while (timeStatus() == timeNotSet) {
     delay(10);
   }
@@ -244,6 +245,12 @@ void updateScreen() {
     display.setFont(ArialMT_Plain_10);
     display.drawString(2, 50, dst);
   }
+  // show NTP status text if we had any reply in the sync interval*1.5
+  if (utc - last_ntp_sync < NTP_SYNC_INTERVAL * 1.5) {
+    String ntp = "NTP";
+    display.setFont(ArialMT_Plain_10);
+    display.drawString(30, 50, ntp);
+  }
 
   if (show_impulse) {
     if (show_impulse > 0) display.drawXbm(90, 50, 16, 8, polarity_a);
@@ -298,6 +305,7 @@ time_t getNtpTime() {
       secsSince1900 |= (unsigned long) packetBuffer[41] << 16;
       secsSince1900 |= (unsigned long) packetBuffer[42] << 8;
       secsSince1900 |= (unsigned long) packetBuffer[43];
+      last_ntp_sync = secsSince1900 - 2208988800UL;
       return secsSince1900 - 2208988800UL;
     }
   }
