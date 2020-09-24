@@ -52,6 +52,7 @@ Timezone ClockTZ(CEST, CET);
 
 unsigned int localPort = 8888;
 WiFiUDP udp;
+static const char hname[] = "esp-clock-controller";
 
 /*
     Slave clock configuration
@@ -142,6 +143,11 @@ void setup() {
     display.clear();
   }
 
+  // workaround for the ESP32 SDK bug, see 
+  // https://github.com/espressif/arduino-esp32/issues/2537#issuecomment-508558849
+  WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE);
+  // set hostname
+  WiFi.setHostname(hname);
   // connect to wifi
   sprintf(console_text, "Connecting to wifi (%s)", WIFI_SSID);
   WiFi.begin(WIFI_SSID, WIFI_KEY);
