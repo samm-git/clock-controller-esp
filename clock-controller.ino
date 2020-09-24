@@ -84,7 +84,6 @@ String twoDigits(int digits) {
 }
 
 void setup() {
-  Serial.begin(115200);
   /* Read slave clock state from the EEPROM using Preferences lib.
      We have 12 * 60 (720) possible values
      in the clock and also we need to keep last used polarity as a sign
@@ -92,7 +91,7 @@ void setup() {
   */
   preferences.begin("clock", false);
   state = preferences.getShort("state", -1);
-  Serial.printf("Booting... Initial state is: %d\n", state);
+  log_i("Booting... Initial state is: %d", state);
   if (state < -721 || state > 721 || state == 0) {
     state = 1; // init clock on 12:00
     preferences.putShort("state", state);
@@ -110,7 +109,7 @@ void setup() {
   // if init mode is on - state is set to 12:00 and pin must be unplugged when
   // slave is displaying this value
   if (initState == LOW) {
-    Serial.println("Clock init mode started");
+    log_i("Clock init mode started");
     display.clear();
     display.setFont(ArialMT_Plain_16);
     display.drawStringMaxWidth(0, 0, 128,
@@ -154,12 +153,11 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED) {
     delay(10);
   }
-  Serial.print("Connected, IP address: ");
-  Serial.println(WiFi.localIP());
+  log_i("Connected, IP address: %s", WiFi.localIP().toString().c_str());
 
-  Serial.println("Starting UDP...");
+  log_i("Starting UDP...");
   udp.begin(localPort);
-  Serial.println("Waiting for sync");
+  log_i("Waiting for sync");
   display.drawStringMaxWidth(0, 10, 128,
                              "Waiting for NTP sync");
   display.display();
@@ -175,10 +173,10 @@ void setup() {
 
 void fixState(short curr_state) {
   char buf[16], buf2[16];
-  Serial.printf("changing state from %d [%s] to %d [%s])\n", state, formatState(abs(state), buf, 16), curr_state, formatState(curr_state, buf2, 16));
+  log_i("changing state from %d [%s] to %d [%s])", state, formatState(abs(state), buf, 16), curr_state, formatState(curr_state, buf2, 16));
   // this should never happens. If clock is behind NTP to up to 5m - do nothing, just wait
   if (abs(state) > curr_state && (abs(state) - curr_state) <= 5) {
-    Serial.printf("Clock is behind NTP for %d minutes, ignoring\n", (int)(abs(state) - curr_state));
+    log_i("Clock is behind NTP for %d minutes, ignoring", (int)(abs(state) - curr_state));
     return;
   }
   if (state > 0) {
@@ -277,18 +275,16 @@ time_t getNtpTime() {
   IPAddress ntpServerIP; // NTP server's ip address
 
   while (udp.parsePacket() > 0); // discard any previously received packets
-  Serial.println("Transmit NTP Request");
+  log_i("Transmit NTP Request");
   // get a random server from the pool
   WiFi.hostByName(ntpServerName, ntpServerIP);
-  Serial.print(ntpServerName);
-  Serial.print(": ");
-  Serial.println(ntpServerIP);
+  log_i("%s:%s", ntpServerName, ntpServerIP.toString().c_str());
   sendNTPpacket(ntpServerIP);
   uint32_t beginWait = millis();
   while (millis() - beginWait < 1500) {
     int size = udp.parsePacket();
     if (size >= NTP_PACKET_SIZE) {
-      Serial.println("Receive NTP Response");
+      log_i("Receive NTP Response");
       udp.read(packetBuffer, NTP_PACKET_SIZE); // read packet into the buffer
       unsigned long secsSince1900;
       // convert four bytes starting at location 40 to a long integer
@@ -299,7 +295,7 @@ time_t getNtpTime() {
       return secsSince1900 - 2208988800UL;
     }
   }
-  Serial.println("No NTP Response :-(");
+  log_i("No NTP Response :-(");
   return 0; // return 0 if unable to get the time
 }
 
