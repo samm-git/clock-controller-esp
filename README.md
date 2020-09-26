@@ -4,6 +4,8 @@ This project is intended to implement a slave clock impulse driver using ESP32 h
 with an OLED display. The time source is NTP, so no RTC module is needed. The code supports timezone
 and DST rules. The state of the slave clock is stored in the Non-Volatile memory to survive power loss or reboot. Board time as well as slave clock time is displayed on the OLED screen.
 
+See [my blog posts](https://smallhacks.wordpress.com/2020/09/26/esp32-based-old-clock-controller-with-ntp-sync/) for the additional details. 
+
 ## Requirements
 
 ### Software
