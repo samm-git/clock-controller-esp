@@ -187,6 +187,7 @@ void setup() {
 void buttonCallback() {
   // disable screensaver if active and update screen
   if(now() - oled_activate > SCREENSAVER_TIMER) {
+    last_t = 0;
     oled_activate = now();
   }
 }
@@ -305,6 +306,7 @@ void loop() {
   }
   if (utc != last_t) { // update screen
     updateScreen();
+    last_t = now();
   }
 }
 
