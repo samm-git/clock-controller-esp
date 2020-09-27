@@ -36,6 +36,9 @@
 static const char ntpServerName[] = "cz.pool.ntp.org";
 #define NTP_SYNC_INTERVAL 300
 
+// Screensaver to save OLED
+#define SCREENSAVER_TIMER 600
+
 // Time Zone (DST) settings, change to your country
 TimeChangeRule CEST = { "CEST", Last, Sun, Mar, 2, 120 }; // Central European Summer Time
 TimeChangeRule CET =  { "CET ", Last, Sun, Oct, 3, 60  }; // Central European Standard Time
@@ -44,7 +47,9 @@ Timezone ClockTZ(CEST, CET);
 // motor controller CH0 pins
 #define PIN_CH00 12
 #define PIN_CH01 13
+// button, using toch mode
 #define PIN_INIT 15
+#define TOUCH_THRESHOLD 5
 
 // display configuration
 #define DISP_I2C 0x3c
@@ -72,6 +77,7 @@ SSD1306Wire display(DISP_I2C, DISP_SDA, DISP_SCL);
 short state = 0;
 int8_t show_impulse = 0;
 time_t last_ntp_sync = 0;
+time_t oled_activate = 0;
 
 char console_text[256];
 Preferences preferences;
@@ -102,16 +108,16 @@ void setup() {
 
   pinMode(PIN_CH00, OUTPUT); // init GPIO to control clock motor
   pinMode(PIN_CH01, OUTPUT);
-  pinMode(PIN_INIT, INPUT_PULLUP);
 
   display.init();
   display.flipScreenVertically();
 
-  int initState = digitalRead(PIN_INIT);
+  int initState = touchRead(PIN_INIT);
+  
 
   // if init mode is on - state is set to 12:00 and pin must be unplugged when
   // slave is displaying this value
-  if (initState == LOW) {
+  if (initState <= TOUCH_THRESHOLD) {
     log_i("Clock init mode started");
     display.clear();
     display.setFont(ArialMT_Plain_16);
@@ -123,7 +129,7 @@ void setup() {
                                "Set clock to 12:00 and unplug when ready");
     display.display();
     state = 1;
-    while (initState == LOW) {
+    while (initState > TOUCH_THRESHOLD) {
       if (state > 0) { // move clock arrow once a second, save last polarity
         state = 1;
         digitalWrite(PIN_CH00, HIGH);
@@ -140,7 +146,7 @@ void setup() {
       digitalWrite(PIN_CH01, LOW);
       delay(IMPULSE_WAIT);
       preferences.putShort("state", state);
-      initState = digitalRead(PIN_INIT);
+      initState = touchRead(PIN_INIT);
     }
     display.clear();
   }
@@ -173,9 +179,17 @@ void setup() {
   while (timeStatus() == timeNotSet) {
     delay(10);
   }
+  oled_activate = now();
+  touchAttachInterrupt(PIN_INIT, buttonCallback, TOUCH_THRESHOLD);
   display.clear();
 }
 
+void buttonCallback() {
+  // disable screensaver if active and update screen
+  if(now() - oled_activate > SCREENSAVER_TIMER) {
+    oled_activate = now();
+  }
+}
 /*-------- Move arrow and update state ----------*/
 
 void fixState(short curr_state) {
@@ -220,16 +234,29 @@ char * formatState(int mystate, char * buf, int bufsize) {
 void updateScreen() {
   char buf[16];
   display.clear();
+  time_t utc = now();
+
+  // screensaver activated
+  if(utc - oled_activate > SCREENSAVER_TIMER) {
+    // draw random pixel
+    display.setPixel(random(display.getWidth()),random(display.getHeight()));
+    delay(25);
+    display.setBrightness(100);
+    display.display();
+    return;
+  }
+  display.setBrightness(255);
+
   display.setFont(ArialMT_Plain_10);
   String wifi;
   if (WiFi.status() != WL_CONNECTED) {
     wifi = "wifi: n/a";
+    oled_activate = now(); // turn on screen if wifi is n/a
   } else {
     wifi = "wifi: " + WiFi.SSID();
   }
   display.drawString(0, 0, wifi);
 
-  time_t utc = now();
   time_t local_t = ClockTZ.toLocal(utc);
   // show NTP time
   String timenow = String(hour(local_t)) + ":" + twoDigits(minute(local_t)) + ":" + twoDigits(second(local_t));
@@ -250,6 +277,8 @@ void updateScreen() {
     String ntp = "NTP";
     display.setFont(ArialMT_Plain_10);
     display.drawString(30, 50, ntp);
+  } else { // turn on screen of NTP is missing
+    oled_activate = now();
   }
 
   if (show_impulse) {
