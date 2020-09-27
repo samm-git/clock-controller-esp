@@ -78,6 +78,7 @@ short state = 0;
 int8_t show_impulse = 0;
 time_t last_ntp_sync = 0;
 time_t oled_activate = 0;
+time_t last_t = 0;
 
 char console_text[256];
 Preferences preferences;
@@ -291,7 +292,6 @@ void updateScreen() {
 }
 
 /*-------- Main loop ----------*/
-time_t last_t = 0;
 void loop() {
   time_t utc = now();
   time_t local_t = ClockTZ.toLocal(utc);
