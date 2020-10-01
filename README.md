@@ -41,3 +41,4 @@ As ESP has no information about the slave clock position - we need to sync them.
 
 ## Related links
 - Another slave clock project, based on ESP8266: software ([gitlab.com/close2/nebenuhr](https://gitlab.com/close2/nebenuhr)) and hardware ([gitlab.com/close2/nebenuhr_hardware/](https://gitlab.com/close2/nebenuhr_hardware))
+- [github.com/melka/masterclock](https://github.com/melka/masterclock]) - master clock for Lepaute 30 seconds alternating pulse slave clock and possibly other models.
