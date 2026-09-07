@@ -275,14 +275,14 @@ void updateScreen() {
   } else {
     snprintf(wifi, sizeof(wifi), "wifi: %s", WiFi.SSID().c_str());
   }
-  display.drawString(0, 0, wifi);
+  display.drawStringMaxWidth(0, 0, 128, wifi);
 
   time_t local_t = ClockTZ.toLocal(utc);
   // show NTP time
   snprintf(timenow, sizeof(timenow), "%d:%02d:%02d", hour(local_t), minute(local_t), second(local_t));
   display.setFont(ArialMT_Plain_16);
   display.drawString(2, 25, timenow);
-  display.drawLine(75, 0, 75, display.getHeight());
+  display.drawLine(75, 15, 75, display.getHeight());
   char * statenow = formatState(abs(state), buf, 16);
   // show state of the slave clock
   display.drawString(85, 25, statenow);
