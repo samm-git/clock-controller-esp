@@ -83,16 +83,6 @@ time_t last_t = 0;
 char console_text[256];
 Preferences preferences;
 
-// utility function for digital clock display: prints leading 0
-String twoDigits(int digits) {
-  if (digits < 10) {
-    String i = '0' + String(digits);
-    return i;
-  } else {
-    return String(digits);
-  }
-}
-
 void setup() {
   /* Read slave clock state from the EEPROM using Preferences lib.
      We have 12 * 60 (720) possible values
@@ -156,6 +146,9 @@ void setup() {
   WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE);
   // set hostname
   WiFi.setHostname(hname);
+  WiFi.onEvent(onWiFiEvent);
+  WiFi.setAutoReconnect(true);
+  WiFi.setSleep(false);
   // connect to wifi
   sprintf(console_text, "Connecting to wifi (%s)", WIFI_SSID);
   WiFi.begin(WIFI_SSID, WIFI_KEY);
@@ -164,10 +157,15 @@ void setup() {
   display.drawStringMaxWidth(0, 0, 128,
                              console_text);
   display.display();
-  while (WiFi.status() != WL_CONNECTED) {
+  unsigned long wifiStart = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - wifiStart < 30000) {
     delay(10);
   }
-  log_i("Connected, IP address: %s", WiFi.localIP().toString().c_str());
+  if (WiFi.status() != WL_CONNECTED) {
+    log_w("WiFi connect timed out, retrying in loop");
+  } else {
+    log_i("Connected, IP address: %s", WiFi.localIP().toString().c_str());
+  }
 
   log_i("Starting UDP...");
   udp.begin(localPort);
@@ -177,12 +175,30 @@ void setup() {
   display.display();
   setSyncProvider(getNtpTime);
   setSyncInterval(NTP_SYNC_INTERVAL); // sync with NTP
-  while (timeStatus() == timeNotSet) {
+  unsigned long ntpStart = millis();
+  while (timeStatus() == timeNotSet && millis() - ntpStart < 30000) {
     delay(10);
+  }
+  if (timeStatus() == timeNotSet) {
+    log_w("NTP sync timed out, retrying in loop");
   }
   oled_activate = now();
   touchAttachInterrupt(PIN_INIT, buttonCallback, TOUCH_THRESHOLD);
   display.clear();
+}
+
+void onWiFiEvent(WiFiEvent_t event) {
+  switch (event) {
+    case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+      log_i("WiFi lost, reconnecting...");
+      WiFi.reconnect();
+      break;
+    case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+      log_i("WiFi connected, IP: %s", WiFi.localIP().toString().c_str());
+      break;
+    default:
+      break;
+  }
 }
 
 void buttonCallback() {
@@ -197,9 +213,10 @@ void buttonCallback() {
 void fixState(short curr_state) {
   char buf[16], buf2[16];
   log_i("changing state from %d [%s] to %d [%s])", state, formatState(abs(state), buf, 16), curr_state, formatState(curr_state, buf2, 16));
-  // this should never happens. If clock is behind NTP to up to 5m - do nothing, just wait
+  // The slave motor can only advance forward. If the clock is up to 5 minutes
+  // ahead of NTP, do nothing and let real time catch up instead of a 12h rewind.
   if (abs(state) > curr_state && (abs(state) - curr_state) <= 5) {
-    log_i("Clock is behind NTP for %d minutes, ignoring", (int)(abs(state) - curr_state));
+    log_i("Clock is ahead of NTP for %d minutes, ignoring", (int)(abs(state) - curr_state));
     return;
   }
   if (state > 0) {
@@ -235,6 +252,8 @@ char * formatState(int mystate, char * buf, int bufsize) {
 
 void updateScreen() {
   char buf[16];
+  char wifi[32];
+  char timenow[16];
   display.clear();
   time_t utc = now();
 
@@ -250,18 +269,17 @@ void updateScreen() {
   display.setBrightness(255);
 
   display.setFont(ArialMT_Plain_10);
-  String wifi;
   if (WiFi.status() != WL_CONNECTED) {
-    wifi = "wifi: n/a";
+    strcpy(wifi, "wifi: n/a");
     oled_activate = now(); // turn on screen if wifi is n/a
   } else {
-    wifi = "wifi: " + WiFi.SSID();
+    snprintf(wifi, sizeof(wifi), "wifi: %s", WiFi.SSID().c_str());
   }
   display.drawString(0, 0, wifi);
 
   time_t local_t = ClockTZ.toLocal(utc);
   // show NTP time
-  String timenow = String(hour(local_t)) + ":" + twoDigits(minute(local_t)) + ":" + twoDigits(second(local_t));
+  snprintf(timenow, sizeof(timenow), "%d:%02d:%02d", hour(local_t), minute(local_t), second(local_t));
   display.setFont(ArialMT_Plain_16);
   display.drawString(2, 25, timenow);
   display.drawLine(75, 0, 75, display.getHeight());
@@ -270,15 +288,13 @@ void updateScreen() {
   display.drawString(85, 25, statenow);
   // show DST if active
   if (ClockTZ.locIsDST(local_t)) {
-    String dst = "DST";
     display.setFont(ArialMT_Plain_10);
-    display.drawString(2, 50, dst);
+    display.drawString(2, 50, "DST");
   }
   // show NTP status text if we had any reply in the sync interval*1.5
   if (utc - last_ntp_sync < NTP_SYNC_INTERVAL * 1.5) {
-    String ntp = "NTP";
     display.setFont(ArialMT_Plain_10);
-    display.drawString(30, 50, ntp);
+    display.drawString(30, 50, "NTP");
   } else { // turn on screen of NTP is missing
     oled_activate = now();
   }
@@ -293,6 +309,21 @@ void updateScreen() {
 
 /*-------- Main loop ----------*/
 void loop() {
+  static unsigned long wifi_lost_at = 0;
+  if (WiFi.status() != WL_CONNECTED) {
+    if (wifi_lost_at == 0) {
+      wifi_lost_at = millis();
+    } else if (millis() - wifi_lost_at > 30000) {
+      log_i("WiFi stuck, forcing reconnect");
+      WiFi.disconnect();
+      delay(100);
+      WiFi.begin(WIFI_SSID, WIFI_KEY);
+      wifi_lost_at = millis();
+    }
+  } else {
+    wifi_lost_at = 0;
+  }
+
   time_t utc = now();
   time_t local_t = ClockTZ.toLocal(utc);
   int hour_12 = hour(local_t);
@@ -300,7 +331,7 @@ void loop() {
   // current 12h time in minutes, starting from 1
   short curr_state = hour_12 * 60 + minute(local_t) + 1;
 
-  if (curr_state != abs(state)) {
+  if (timeStatus() != timeNotSet && curr_state != abs(state)) {
     fixState(curr_state);
     delay(IMPULSE_WAIT); // cool down device :)
   }
@@ -321,7 +352,10 @@ time_t getNtpTime() {
   while (udp.parsePacket() > 0); // discard any previously received packets
   log_i("Transmit NTP Request");
   // get a random server from the pool
-  WiFi.hostByName(ntpServerName, ntpServerIP);
+  if (!WiFi.hostByName(ntpServerName, ntpServerIP)) {
+    log_w("DNS lookup for %s failed", ntpServerName);
+    return 0;
+  }
   log_i("%s:%s", ntpServerName, ntpServerIP.toString().c_str());
   sendNTPpacket(ntpServerIP);
   uint32_t beginWait = millis();
